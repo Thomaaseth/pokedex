@@ -153,6 +153,18 @@ func inspectPokemon(config *Config, args []string) error {
 	return nil
 }
 
+func pokedex(config *Config, args []string) error {
+	if len(config.CaughtPokemon) == 0 {
+		fmt.Println("You haven't caught any pokemons yet!")
+		return nil
+	}
+	fmt.Println("Your Pokedex:")
+	for name := range config.CaughtPokemon {
+		fmt.Printf(" - %s\n", name)
+	}
+	return nil
+}
+
 var commands map[string]cliCommand
 var r *rand.Rand
 
@@ -375,11 +387,11 @@ func main() {
 			description: "Get details of a pokemon",
 			callback:    func(args []string) error { return inspectPokemon(config, args) },
 		},
-		// "pokedex": {
-		// 	name:        "pokedex",
-		// 	description: "retrieve all your caught pokemons",
-		// 	callback:    func() error { return pokedex() },
-		// },
+		"pokedex": {
+			name:        "pokedex",
+			description: "retrieve all your caught pokemons",
+			callback:    func(args []string) error { return pokedex(config, args) },
+		},
 	}
 
 	for {
