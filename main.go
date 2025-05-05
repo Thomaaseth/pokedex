@@ -126,6 +126,33 @@ func catchPokemon(config *Config, args []string) error {
 	return nil
 }
 
+func inspectPokemon(config *Config, args []string) error {
+	if len(args) == 0 {
+		fmt.Println("you must provide a pokemon name")
+		return nil
+	}
+	pokemonName := args[0]
+
+	pokemon, found := config.CaughtPokemon[pokemonName]
+	if !found {
+		fmt.Println("You haven't caught this pokemon yet!")
+		return nil
+	}
+	fmt.Printf("Name: %s\n", pokemon.Name)
+	fmt.Printf("Height: %d\n", pokemon.Height)
+	fmt.Printf("Weight: %d\n", pokemon.Weight)
+	fmt.Printf("Stats: \n")
+	for _, stat := range pokemon.Stats {
+		fmt.Printf("  -%s: %d\n", stat.Stat.Name, stat.BaseStat)
+	}
+	fmt.Println("Types:")
+	for _, typeInfo := range pokemon.Types {
+		fmt.Printf("  - %s\n", typeInfo.Type.Name)
+	}
+
+	return nil
+}
+
 var commands map[string]cliCommand
 var r *rand.Rand
 
@@ -160,9 +187,26 @@ type PokemonEncounter struct {
 }
 
 type Pokemon struct {
-	ID             int    `json:"id"`
-	Name           string `json:"name"`
-	BaseExperience int    `json:"base_experience"`
+	ID             int           `json:"id"`
+	Name           string        `json:"name"`
+	Height         int           `json:"height"`
+	Weight         int           `json:"weight"`
+	Stats          []PokemonStat `json:"stats"`
+	Types          []PokemonType `json:"types"`
+	BaseExperience int           `json:"base_experience"`
+}
+
+type PokemonStat struct {
+	BaseStat int `json:"base_stat"`
+	Stat     struct {
+		Name string `json:"name"`
+	} `json:"stat"`
+}
+
+type PokemonType struct {
+	Type struct {
+		Name string `json:"name"`
+	} `json:"type"`
 }
 
 type LocationAreaDetails struct {
@@ -326,6 +370,16 @@ func main() {
 			description: "Try to catch a pokemon",
 			callback:    func(args []string) error { return catchPokemon(config, args) },
 		},
+		"inspect": {
+			name:        "inspect <pokemon name>",
+			description: "Get details of a pokemon",
+			callback:    func(args []string) error { return inspectPokemon(config, args) },
+		},
+		// "pokedex": {
+		// 	name:        "pokedex",
+		// 	description: "retrieve all your caught pokemons",
+		// 	callback:    func() error { return pokedex() },
+		// },
 	}
 
 	for {
