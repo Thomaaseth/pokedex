@@ -8,6 +8,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
+
+	pokecache "github.com/Thomaaseth/pokedexcli/internal"
 )
 
 func cleanInput(text string) []string {
@@ -37,7 +40,7 @@ func commandMap(config *Config) error {
 		url = *config.Next
 	}
 
-	locs, err := getLocations(url)
+	locs, err := getLocations(url, config.Cache)
 	if err != nil {
 		return err
 	}
@@ -57,7 +60,7 @@ func commandMapb(config *Config) error {
 		return nil
 	}
 	url := *config.Previous
-	locs, err := getLocations(url)
+	locs, err := getLocations(url, config.Cache)
 	if err != nil {
 		return err
 	}
@@ -81,6 +84,7 @@ type cliCommand struct {
 type Config struct {
 	Next     *string
 	Previous *string
+	Cache    *pokecache.Cache
 }
 
 type locations struct {
@@ -94,20 +98,41 @@ type locationArea struct {
 	Url  string `json:"url"`
 }
 
-func getLocations(url string) (locations, error) {
+func getLocations(url string, cache *pokecache.Cache) (locations, error) {
 	if url == "" {
 		url = "https://pokeapi.co/api/v2/location-area/"
 	}
+	if cachedData, found := cache.Get(url); found {
+		fmt.Println("Using cached data for:", url)
+
+		var locs locations
+		err := json.Unmarshal(cachedData, &locs)
+		if err != nil {
+			fmt.Println("Error unmarshalling cached content")
+			return locations{}, err
+		}
+		return locs, nil
+	}
+
+	// If not in cache, make the HTTP request
+	fmt.Println("Fetching data from API:", url)
 	resp, err := http.Get(url)
 	if err != nil {
 		fmt.Println("Error getting list of locations")
 		return locations{}, err
 	}
+
 	defer resp.Body.Close()
+
 	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("Error reading resp body")
+		return locations{}, err
+	}
+
+	cache.Add(url, body)
 
 	var locs locations
-
 	err = json.Unmarshal(body, &locs)
 	if err != nil {
 		fmt.Println("Error unmarshalling content")
@@ -118,7 +143,10 @@ func getLocations(url string) (locations, error) {
 
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
-	config := &Config{}
+	cache := pokecache.NewCache(5 * time.Minute)
+	config := &Config{
+		Cache: cache,
+	}
 
 	commands = map[string]cliCommand{
 		"exit": {
