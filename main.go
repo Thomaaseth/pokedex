@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -20,13 +21,13 @@ func cleanInput(text string) []string {
 	return words
 }
 
-func commandExit() error {
+func commandExit(args []string) error {
 	fmt.Println("Closing the Pokedex... Goodbye!")
 	os.Exit(0)
 	return nil
 }
 
-func commandHelp() error {
+func commandHelp(args []string) error {
 	fmt.Println("Welcome to the Pokedex!\nUsage:")
 	for key, value := range commands {
 		fmt.Println(key + ": " + value.description)
@@ -34,7 +35,7 @@ func commandHelp() error {
 	return nil
 }
 
-func commandMap(config *Config) error {
+func commandMap(config *Config, args []string) error {
 	url := ""
 	if config.Next != nil {
 		url = *config.Next
@@ -54,7 +55,7 @@ func commandMap(config *Config) error {
 	return nil
 }
 
-func commandMapb(config *Config) error {
+func commandMapb(config *Config, args []string) error {
 	if config.Previous == nil {
 		fmt.Println("You're on the first page")
 		return nil
@@ -73,18 +74,72 @@ func commandMapb(config *Config) error {
 	return nil
 }
 
+func exploreMap(config *Config, args []string) error {
+	if len(args) == 0 {
+		fmt.Println("you must provide a location area name")
+		return nil
+	}
+	locationAreaName := args[0]
+
+	fmt.Printf("Exploring %s...\n", locationAreaName)
+
+	details, err := getLocationDetails(locationAreaName, config.Cache)
+	if err != nil {
+		return fmt.Errorf("error exploring location area: %s", err)
+	}
+
+	fmt.Println("Found Pokemon:")
+	for _, encounter := range details.PokemonEncounters {
+		fmt.Printf(" - %s\n", encounter.Pokemon.Name)
+	}
+
+	return nil
+}
+
+func catchPokemon(config *Config, args []string) error {
+	if len(args) == 0 {
+		fmt.Println("you must provide a pokemon name")
+		return nil
+	}
+	pokemonName := args[0]
+
+	fmt.Printf("Throwing a Pokeball at %s...\n", pokemonName)
+
+	pokemon, err := getPokemonDetails(pokemonName, config.Cache)
+	if err != nil {
+		return fmt.Errorf("error retrieving pokemon details")
+	}
+	catchChance := 100 - (pokemon.BaseExperience / 4)
+	if catchChance < 0 {
+		catchChance = 0
+	}
+	if catchChance > 90 {
+		catchChance = 90
+	}
+	randomNum := r.Intn(101)
+	if randomNum <= catchChance {
+		fmt.Printf("%s was caught!\n", pokemonName)
+		config.CaughtPokemon[pokemonName] = pokemon
+	} else {
+		fmt.Printf("%s escaped!\n", pokemonName)
+	}
+	return nil
+}
+
 var commands map[string]cliCommand
+var r *rand.Rand
 
 type cliCommand struct {
 	name        string
 	description string
-	callback    func() error
+	callback    func([]string) error
 }
 
 type Config struct {
-	Next     *string
-	Previous *string
-	Cache    *pokecache.Cache
+	Next          *string
+	Previous      *string
+	Cache         *pokecache.Cache
+	CaughtPokemon map[string]Pokemon
 }
 
 type locations struct {
@@ -96,6 +151,23 @@ type locations struct {
 type locationArea struct {
 	Name string `json:"name"`
 	Url  string `json:"url"`
+}
+
+type PokemonEncounter struct {
+	Pokemon struct {
+		Name string `json:"name"`
+	} `json:"pokemon"`
+}
+
+type Pokemon struct {
+	ID             int    `json:"id"`
+	Name           string `json:"name"`
+	BaseExperience int    `json:"base_experience"`
+}
+
+type LocationAreaDetails struct {
+	Name              string             `json:"name"`
+	PokemonEncounters []PokemonEncounter `json:"pokemon_encounters"`
 }
 
 func getLocations(url string, cache *pokecache.Cache) (locations, error) {
@@ -141,33 +213,118 @@ func getLocations(url string, cache *pokecache.Cache) (locations, error) {
 	return locs, nil
 }
 
+func getLocationDetails(locationName string, cache *pokecache.Cache) (LocationAreaDetails, error) {
+	url := fmt.Sprintf("https://pokeapi.co/api/v2/location-area/%s", locationName)
+
+	// Check cache first
+	if cachedData, found := cache.Get(url); found {
+		fmt.Println("Using cached data for:", url)
+
+		var details LocationAreaDetails
+		err := json.Unmarshal(cachedData, &details)
+		if err != nil {
+			return LocationAreaDetails{}, fmt.Errorf("error unmashalling cached content: %w", err)
+		}
+		return details, nil
+	}
+
+	// If not in cached, make HTTP request
+	fmt.Println("Fetching data from API:", url)
+	resp, err := http.Get(url)
+	if err != nil {
+		return LocationAreaDetails{}, fmt.Errorf("error getting location details: %w", err)
+	}
+
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return LocationAreaDetails{}, fmt.Errorf("error reading response: %w", err)
+	}
+
+	cache.Add(url, body)
+
+	var details LocationAreaDetails
+	err = json.Unmarshal(body, &details)
+	if err != nil {
+		return LocationAreaDetails{}, fmt.Errorf("error unmarshalling content: %w", err)
+	}
+	return details, nil
+}
+
+func getPokemonDetails(pokemonName string, cache *pokecache.Cache) (Pokemon, error) {
+	url := fmt.Sprintf("https://pokeapi.co/api/v2/pokemon/%s/", pokemonName)
+
+	if cachedData, found := cache.Get(url); found {
+		fmt.Println("Using cached data for:", url)
+
+		var pokemon Pokemon
+		err := json.Unmarshal(cachedData, &pokemon)
+		if err != nil {
+			return Pokemon{}, fmt.Errorf("error unmashalling cached content: %w", err)
+		}
+		return pokemon, nil
+	}
+	fmt.Println("Fetching data from API:", url)
+	resp, err := http.Get(url)
+	if err != nil {
+		return Pokemon{}, fmt.Errorf("error getting pokemon details: %w", err)
+	}
+
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return Pokemon{}, fmt.Errorf("error reading response: %w", err)
+	}
+
+	cache.Add(url, body)
+
+	var pokemon Pokemon
+	err = json.Unmarshal(body, &pokemon)
+	if err != nil {
+		return Pokemon{}, fmt.Errorf("error unmarshalling content: %w", err)
+	}
+	return pokemon, nil
+}
+
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	cache := pokecache.NewCache(5 * time.Minute)
+	r = rand.New(rand.NewSource(time.Now().UnixNano()))
 	config := &Config{
-		Cache: cache,
+		Cache:         cache,
+		CaughtPokemon: make(map[string]Pokemon),
 	}
 
 	commands = map[string]cliCommand{
 		"exit": {
 			name:        "exit",
 			description: "Exit the Pokedex",
-			callback:    func() error { return commandExit() },
+			callback:    commandExit,
 		},
 		"help": {
 			name:        "help",
 			description: "Displays a help message",
-			callback:    func() error { return commandHelp() },
+			callback:    commandHelp,
 		},
 		"map": {
 			name:        "map",
 			description: "Show the next 20 Pokemon locations",
-			callback:    func() error { return commandMap(config) },
+			callback:    func(args []string) error { return commandMap(config, args) },
 		},
 		"mapb": {
 			name:        "mapb",
 			description: "Show the previous 20 Pokemon locations",
-			callback:    func() error { return commandMapb(config) },
+			callback:    func(args []string) error { return commandMapb(config, args) },
+		},
+		"explore": {
+			name:        "explore <location name>",
+			description: "Show a list of all Pokemons located here",
+			callback:    func(args []string) error { return exploreMap(config, args) },
+		},
+		"catch": {
+			name:        "catch <pokemon name>",
+			description: "Try to catch a pokemon",
+			callback:    func(args []string) error { return catchPokemon(config, args) },
 		},
 	}
 
@@ -179,10 +336,10 @@ func main() {
 		words := cleanInput(userInput)
 		if len(words) > 0 {
 			firstWord := words[0]
-
+			args := words[1:]
 			cmd, ok := commands[firstWord]
 			if ok {
-				cmd.callback()
+				cmd.callback(args)
 			} else {
 				fmt.Println("Unknown command")
 			}
