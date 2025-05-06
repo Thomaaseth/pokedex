@@ -39,83 +39,81 @@ Once the Pokedex CLI is running, you'll see a prompt:
 Pokedex >
 
 You can use the following commands:
-- help Displays a help message with all available commands
-- exit Exit the Pokedex application
-- map Show the next 20 Pokemon locations
-- mapb Show the previous 20 Pokemon locations
-- explore <location name> Show a list of all Pokemon found at the specified location
-- catch <pokemon name> Try to catch a Pokemon
-- inspect <pokemon name> Get details of a caught Pokemon
-- pokedex View all your caught Pokemon
+- help: Displays a help message with all available commands
+- exit: Exit the Pokedex application
+- map: Show the next 20 Pokemon locations
+- mapb: Show the previous 20 Pokemon locations
+- explore < location name >: Show a list of all Pokemon found at the specified location
+- catch < pokemon name >: Try to catch a Pokemon
+- inspect < pokemon name >: Get details of a caught Pokemon
+- pokedex: View all your caught Pokemon
 
 #### Examples
 
 **Exploring a location**:
-Pokedex > explore canalave-city-area
+```Pokedex > explore canalave-city-area
 Exploring canalave-city-area...
 Found Pokemon:
  - staravia
  - starly
  - chimchar
  - turtwig
- - piplup
+ - piplup```
 
 **Catching a Pokemon**:
-Pokedex > catch pikachu
+```Pokedex > catch pikachu
 Throwing a Pokeball at pikachu...
-pikachu was caught!
+pikachu was caught!```
 
 **Inspecting a Pokemon**:
-Pokedex > inspect pikachu
+```Pokedex > inspect pikachu
 Name: pikachu
 Height: 4
 Weight: 60
 Stats: 
-  -hp: 35
-  -attack: 55
-  -defense: 40
-  -special-attack: 50
-  -special-defense: 50
-  -speed: 90
+  - hp: 35
+  - attack: 55
+  - defense: 40
+  - special-attack: 50
+  - special-defense: 50
+  - speed: 90
 Types:
-  - electric
+  - electric```
 
 ### Architecture
 
 #### Major Components
 
-CLI Interface: 
+```CLI Interface: 
 Handles user input/output and command processing
 API Client: Communicates with the PokeAPI to fetch Pokemon data
 Cache System: Stores API responses to minimize network requests
-Pokemon Storage: Manages the user's caught Pokemon collection
+Pokemon Storage: Manages the user's caught Pokemon collection```
 
-Data Flow:
+```Data Flow:
 User enters a command
 Command is processed and relevant function is called
 If data is needed, the system first checks the cache
 If not in cache, an API request is made and the result is cached
-Data is displayed to the user
+Data is displayed to the user```
 
-Dependencies:
+```Dependencies:
 Standard Go libraries: bufio, encoding/json, fmt, io, math/rand, net/http, os, strings, time
-Custom cache package: package github.com/{your-username}/pokedex/internal/pokecache
+Custom cache package: package github.com/{your-username}/pokedex/internal/pokecache```
 
-API:
-This project utilizes the PokeAPI, a free and open RESTful Pokemon API.
+```API:
+This project utilizes the PokeAPI, a free and open RESTful Pokemon API```
 
 ### License
 MIT License
 
 ### Contributing
-
-Fork the repository:
+```Fork the repository:
 Create your feature branch (git checkout -b feature/amazing-feature)
 Commit your changes (git commit -m 'Add some amazing feature')
 Push to the branch (git push origin feature/amazing-feature)
-Open a Pull Request
+Open a Pull Request```
 
 ### Acknowledgments
-
-PokeAPI for providing the Pokemon data
-Built with Boot.dev as guided project
+```PokeAPI for providing the Pokemon data
+Built with Boot.dev as guided project```
